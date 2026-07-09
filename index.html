@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎧 音效整活器 — 精神状态良好版</title>
+<style>
+  /* ===== Reset & Base ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    background-size: 400% 400%;
+    animation: bgShift 12s ease infinite;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+    position: relative;
+  }
+  @keyframes bgShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ===== 漂浮 emoji 背景粒子 ===== */
+  .floating-emojis {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  .floating-emojis span {
+    position: absolute;
+    font-size: 28px;
+    animation: floatUp linear infinite;
+    opacity: 0.35;
+    user-select: none;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(110vh) rotate(0deg) scale(0.5); opacity: 0; }
+    10%  { opacity: 0.4; }
+    90%  { opacity: 0.4; }
+    100% { transform: translateY(-10vh) rotate(360deg) scale(1.2); opacity: 0; }
+  }
+
+  /* ===== 顶部跑马灯 ===== */
+  .marquee-wrap {
+    width: 100%; max-width: 900px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    position: relative; z-index: 1;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .marquee {
+    display: flex; gap: 40px;
+    padding: 10px 0;
+    animation: marqueeScroll 20s linear infinite;
+    white-space: nowrap;
+    color: #fffc;
+    font-size: 14px;
+    letter-spacing: 2px;
+  }
+  .marquee span { flex-shrink: 0; }
+  @keyframes marqueeScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ===== 标题区 ===== */
+  .header {
+    position: relative; z-index: 1;
+    text-align: center; margin-bottom: 12px;
+  }
+  .title {
+    font-size: clamp(28px, 6vw, 48px);
+    font-weight: 900;
+    background: linear-gradient(90deg, #f7971e, #ffd200, #f7971e, #ff5e62);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: titleShine 3s linear infinite;
+    filter: drop-shadow(0 0 18px #ff5e6288);
+    line-height: 1.3;
+  }
+  @keyframes titleShine {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+  .subtitle {
+    color: #a0a0cc;
+    font-size: 14px;
+    margin-top: 4px;
+    letter-spacing: 3px;
+    animation: glitch 3s steps(1) infinite;
+  }
+  @keyframes glitch {
+    0%, 93%, 97%, 100% { transform: translate(0); }
+    94% { transform: translate(-3px, 1px); }
+    95% { transform: translate(3px, -1px); }
+    96% { transform: translate(-1px, -2px); }
+  }
+
+  /* ===== Checkbox 开关 ===== */
+  .toggle-row {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 28px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 30px;
+    padding: 12px 24px;
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.25s;
+  }
+  .toggle-row:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,200,0,0.4);
+    box-shadow: 0 0 20px rgba(255,200,0,0.15);
+  }
+  .toggle-row input { display: none; }
+  .toggle-track {
+    width: 52px; height: 28px;
+    background: #555;
+    border-radius: 14px;
+    position: relative;
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .toggle-track::after {
+    content: "";
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 22px; height: 22px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  .toggle-row input:checked + .toggle-track {
+    background: #ff5e62;
+    box-shadow: 0 0 12px #ff5e6288;
+  }
+  .toggle-row input:checked + .toggle-track::after {
+    transform: translateX(24px);
+  }
+  .toggle-label {
+    color: #ddd;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .toggle-label small { color: #999; font-weight: 400; margin-left: 4px; }
+
+  /* ===== 按钮网格 ===== */
+  .grid {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    max-width: 900px;
+    width: 100%;
+  }
+  @media (max-width: 768px) {
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  }
+  @media (max-width: 400px) {
+    .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .title { font-size: 24px; }
+  }
+
+  /* ===== 按钮 ===== */
+  .btn-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 24px 12px 20px;
+    border-radius: 20px;
+    border: 2px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.2s;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(4px);
+    -webkit-tap-highlight-color: transparent;
+    min-height: 130px;
+  }
+  .btn-card::before {
+    content: "";
+    position: absolute; inset: 0;
+    opacity: 0; transition: opacity 0.25s;
+    border-radius: 18px;
+    z-index: 0; pointer-events: none;
+  }
+  .btn-card:hover::before { opacity: 0.25; }
+  .btn-card:active { transform: scale(0.94); }
+
+  /* 每个按钮不同色调 */
+  .btn-card:nth-child(1) { --c: #ff6b6b; }
+  .btn-card:nth-child(2) { --c: #ffd93d; }
+  .btn-card:nth-child(3) { --c: #6bcb77; }
+  .btn-card:nth-child(4) { --c: #4d96ff; }
+  .btn-card:nth-child(5) { --c: #ff922b; }
+  .btn-card:nth-child(6) { --c: #cc5de8; }
+  .btn-card:nth-child(7) { --c: #20c997; }
+  .btn-card:nth-child(8) { --c: #f06595; }
+
+  .btn-card:hover {
+    border-color: var(--c);
+    box-shadow: 0 0 30px color-mix(in srgb, var(--c) 40%, transparent),
+                0 8px 32px rgba(0,0,0,0.3);
+    transform: translateY(-3px);
+  }
+  .btn-card:active { transform: translateY(0) scale(0.94); }
+
+  .btn-emoji {
+    font-size: 40px;
+    position: relative; z-index: 1;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));
+    transition: transform 0.2s;
+  }
+  .btn-card:hover .btn-emoji { transform: scale(1.15) rotate(-5deg); }
+  .btn-name {
+    font-size: 15px; font-weight: 700;
+    color: #fff;
+    position: relative; z-index: 1;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* playing 状态脉冲 */
+  .btn-card.playing {
+    animation: pulse 0.8s ease-in-out infinite;
+    border-color: var(--c) !important;
+    box-shadow: 0 0 30px color-mix(in srgb, var(--c) 60%, transparent) !important;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 20px color-mix(in srgb, var(--c) 30%, transparent); }
+    50%      { box-shadow: 0 0 50px color-mix(in srgb, var(--c) 70%, transparent),
+                          0 0 80px color-mix(in srgb, var(--c) 40%, transparent); }
+  }
+  .btn-card.playing .btn-emoji {
+    animation: bounce 0.4s ease-in-out infinite;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%      { transform: translateY(-10px) scale(1.1); }
+  }
+
+  /* ===== 当前播放提示条 ===== */
+  .now-playing {
+    position: relative; z-index: 1;
+    margin-top: 28px;
+    padding: 10px 24px;
+    border-radius: 30px;
+    background: rgba(255,255,255,0.07);
+    color: #ccc;
+    font-size: 14px;
+    letter-spacing: 1px;
+    border: 1px solid rgba(255,255,255,0.1);
+    min-height: 42px;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 0.3s;
+  }
+  .now-playing.active {
+    color: #ffd200;
+    border-color: rgba(255,210,0,0.4);
+    background: rgba(255,210,0,0.08);
+  }
+  .now-playing .wave {
+    display: none; gap: 3px; align-items: end;
+  }
+  .now-playing.active .wave {
+    display: flex;
+  }
+  .wave span {
+    width: 4px; background: #ffd200;
+    border-radius: 2px;
+    animation: wave 0.6s ease-in-out infinite;
+  }
+  .wave span:nth-child(1) { height: 10px; animation-delay: 0s; }
+  .wave span:nth-child(2) { height: 18px; animation-delay: 0.1s; }
+  .wave span:nth-child(3) { height: 12px; animation-delay: 0.2s; }
+  .wave span:nth-child(4) { height: 20px; animation-delay: 0.3s; }
+  .wave span:nth-child(5) { height: 8px;  animation-delay: 0.4s; }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.5); }
+    50%      { transform: scaleY(1); }
+  }
+
+  /* ===== 底部梗 ===== */
+  .footer {
+    position: relative; z-index: 1;
+    margin-top: 36px;
+    color: #666;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-align: center;
+    line-height: 1.8;
+  }
+  .footer .meme { color: #888; }
+</style>
+</head>
+<body>
+
+<!-- 漂浮 emoji 背景 -->
+<div class="floating-emojis" id="floatingEmojis"></div>
+
+<!-- 跑马灯 -->
+<div class="marquee-wrap">
+  <div class="marquee" id="marquee">
+    <span>🤪 精神状态良好</span>
+    <span>💅 已黑化</span>
+    <span>🫠 遥遥领先</span>
+    <span>🤡 小丑竟是我自己</span>
+    <span>🔥 泰酷辣</span>
+    <span>💀 我真的会谢</span>
+    <span>🐉 奶龙出击</span>
+    <span>🫡 收到请扣1</span>
+    <span>😭 破防了</span>
+    <span>👻 啊对对对</span>
+    <span>🫵 你礼貌吗</span>
+    <span>🍌 蕉个朋友</span>
+    <span>🤯 CPU烧了</span>
+    <span>🦋 绝绝子</span>
+    <span>⚡ 闪电五连鞭</span>
+    <span>🎭 人生如戏全靠演技</span>
+  </div>
+</div>
+
+<!-- 标题 -->
+<div class="header">
+  <div class="title">🎧 音 效 整 活 器</div>
+  <div class="subtitle">— 精 神 状 态 良 好 —</div>
+</div>
+
+<!-- 疯狂模式开关 -->
+<label class="toggle-row" title="勾上之后，点一次响一次，无限连击！">
+  <input type="checkbox" id="crazyMode">
+  <div class="toggle-track"></div>
+  <span class="toggle-label">⚡ 疯狂星期四模式 <small>— 每点必响，火力全开！</small></span>
+</label>
+
+<!-- 按钮网格 -->
+<div class="grid" id="btnGrid"></div>
+
+<!-- 当前播放 -->
+<div class="now-playing" id="nowPlaying">
+  <div class="wave"><span></span><span></span><span></span><span></span><span></span></div>
+  <span id="nowPlayingText">🔇 暂无音效播放，来点一下？</span>
+</div>
+
+<!-- 底部 -->
+<div class="footer">
+  <p class="meme">「已经没有什么好害怕的了」— 巴麻美（不是）</p>
+  <p class="meme">本页面由 精神状态不太好的 AI 与人类联手打造 · 如有雷同，那就是缘分</p>
+  <p class="meme">⚠️ 公共场合请控制音量，社死概不负责 ⚠️</p>
+</div>
+
+<script>
+(function() {
+  // ============ 音效列表 ============
+  const sounds = [
+    { file: "OMG吓死我啦.mp3",  emoji: "😱", label: "OMG吓死我啦" },
+    { file: "奶龙笑.mp3",        emoji: "🐉", label: "奶龙笑" },
+    { file: "小丑音效.mp3",      emoji: "🤡", label: "小丑音效" },
+    { file: "我要演牌.mp3",      emoji: "🃏", label: "我要演牌" },
+    { file: "枪毙.mp3",          emoji: "🔫", label: "枪毙" },
+    { file: "牌没有问题.mp3",    emoji: "✅", label: "牌没有问题" },
+    { file: "给我擦皮鞋.mp3",    emoji: "👞", label: "给我擦皮鞋" },
+    { file: "重机枪.mp3",        emoji: "💥", label: "重机枪" },
+  ];
+
+  // ============ 状态 ============
+  let currentAudio = null;
+  let currentIndex = -1;
+  const crazyCheckbox = document.getElementById("crazyMode");
+  const nowPlayingEl = document.getElementById("nowPlaying");
+  const nowPlayingText = document.getElementById("nowPlayingText");
+  const btnGrid = document.getElementById("btnGrid");
+
+  // ============ 停止当前音效 ============
+  function stopCurrent() {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+    }
+    // 移除所有 playing 状态
+    document.querySelectorAll(".btn-card.playing").forEach(el => el.classList.remove("playing"));
+    currentIndex = -1;
+    nowPlayingEl.classList.remove("active");
+    nowPlayingText.textContent = "🔇 暂无音效播放，来点一下？";
+  }
+
+  // ============ 播放音效 ============
+  function playSound(index) {
+    const sound = sounds[index];
+    const audio = new Audio(sound.file);
+
+    audio.addEventListener("ended", () => {
+      // 播放完毕自动清理
+      document.querySelectorAll(".btn-card.playing").forEach(el => el.classList.remove("playing"));
+      nowPlayingEl.classList.remove("active");
+      nowPlayingText.textContent = "🔇 暂无音效播放，来点一下？";
+      if (currentAudio === audio) {
+        currentAudio = null;
+        currentIndex = -1;
+      }
+    });
+
+    audio.addEventListener("error", () => {
+      stopCurrent();
+      nowPlayingText.textContent = "❌ 加载失败: " + sound.label;
+    });
+
+    audio.play().catch(err => {
+      console.error("播放失败:", sound.file, err);
+      stopCurrent();
+      nowPlayingText.textContent = "❌ 播放失败，请检查文件是否存在";
+    });
+
+    // 替换当前
+    if (currentAudio && currentAudio !== audio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+    document.querySelectorAll(".btn-card.playing").forEach(el => el.classList.remove("playing"));
+
+    currentAudio = audio;
+    currentIndex = index;
+
+    // UI 状态
+    const card = document.querySelector(`.btn-card[data-index="${index}"]`);
+    if (card) card.classList.add("playing");
+    nowPlayingEl.classList.add("active");
+    nowPlayingText.textContent = "🔊 正在播放：" + sound.label;
+  }
+
+  // ============ 处理按钮点击 ============
+  function handleClick(index) {
+    const isCrazy = crazyCheckbox.checked;
+
+    if (currentIndex === index && currentAudio) {
+      // 点击的是正在播放的按钮
+      if (isCrazy) {
+        // 疯狂模式：从头重播
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+        document.querySelectorAll(".btn-card.playing").forEach(el => el.classList.remove("playing"));
+        playSound(index);
+      } else {
+        // 普通模式：停止
+        stopCurrent();
+      }
+    } else {
+      // 点击不同按钮，或者当前没有在播放
+      playSound(index);
+    }
+  }
+
+  // ============ 渲染按钮 ============
+  sounds.forEach((s, i) => {
+    const card = document.createElement("div");
+    card.className = "btn-card";
+    card.setAttribute("data-index", i);
+    card.innerHTML = `<span class="btn-emoji">${s.emoji}</span><span class="btn-name">${s.label}</span>`;
+    card.addEventListener("click", () => handleClick(i));
+    btnGrid.appendChild(card);
+  });
+
+  // ============ 漂浮 emoji 背景 ============
+  const floatContainer = document.getElementById("floatingEmojis");
+  const floatEmojis = ["😂","🤣","💀","🤡","🔥","😭","🫠","👻","🍌","🦋","🤯","💅","⚡","🎭","🫡","😱"];
+  for (let i = 0; i < 18; i++) {
+    const span = document.createElement("span");
+    span.textContent = floatEmojis[Math.floor(Math.random() * floatEmojis.length)];
+    span.style.left = Math.random() * 100 + "%";
+    span.style.animationDuration = (8 + Math.random() * 16) + "s";
+    span.style.animationDelay = Math.random() * 12 + "s";
+    span.style.fontSize = (18 + Math.random() * 30) + "px";
+    floatContainer.appendChild(span);
+  }
+
+  // ============ 页面关闭时停止 ============
+  window.addEventListener("beforeunload", () => {
+    stopCurrent();
+  });
+
+  // ============ 页面隐藏时也停止（切 Tab / 锁屏） ============
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && currentAudio) {
+      stopCurrent();
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
