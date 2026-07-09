@@ -160,7 +160,7 @@
   .grid {
     position: relative; z-index: 1;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
     max-width: 900px;
     width: 100%;
@@ -211,6 +211,7 @@
   .btn-card:nth-child(6) { --c: #cc5de8; }
   .btn-card:nth-child(7) { --c: #20c997; }
   .btn-card:nth-child(8) { --c: #f06595; }
+  .btn-card:nth-child(9) { --c: #ff6b9d; }
 
   .btn-card:hover {
     border-color: var(--c);
@@ -219,6 +220,73 @@
     transform: translateY(-3px);
   }
   .btn-card:active { transform: translateY(0) scale(0.94); }
+
+  /* ===== 拖拽排序模式 ===== */
+  .drag-toggle-btn {
+    z-index: 1; position: relative;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    color: #888;
+    cursor: pointer; font-size: 12px;
+    letter-spacing: 1px;
+    transition: all 0.25s;
+    margin-bottom: 20px;
+    font-family: inherit;
+  }
+  .drag-toggle-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; }
+  .drag-toggle-btn.active {
+    background: rgba(100,200,255,0.18);
+    border-color: rgba(100,200,255,0.45);
+    color: #6cf;
+    box-shadow: 0 0 16px rgba(100,200,255,0.15);
+  }
+  .grid.drag-mode .btn-card {
+    cursor: grab;
+    animation: wiggle 0.35s ease-in-out infinite;
+    border-style: dashed;
+    user-select: none;
+  }
+  .grid.drag-mode .btn-card:nth-child(1) { animation-delay: 0s; }
+  .grid.drag-mode .btn-card:nth-child(2) { animation-delay: 0.05s; }
+  .grid.drag-mode .btn-card:nth-child(3) { animation-delay: 0.1s; }
+  .grid.drag-mode .btn-card:nth-child(4) { animation-delay: 0.15s; }
+  .grid.drag-mode .btn-card:nth-child(5) { animation-delay: 0.2s; }
+  .grid.drag-mode .btn-card:nth-child(6) { animation-delay: 0.25s; }
+  .grid.drag-mode .btn-card:nth-child(7) { animation-delay: 0.3s; }
+  .grid.drag-mode .btn-card:nth-child(8) { animation-delay: 0.35s; }
+  .grid.drag-mode .btn-card:nth-child(9) { animation-delay: 0.4s; }
+  .grid.drag-mode .btn-card:active { cursor: grabbing; }
+  @keyframes wiggle {
+    0%,100% { transform: rotate(0deg); }
+    25%     { transform: rotate(-1.2deg); }
+    75%     { transform: rotate(1.2deg); }
+  }
+  .grid.drag-mode .btn-card.playing {
+    animation: wiggle 0.35s ease-in-out infinite, pulse 0.8s ease-in-out infinite;
+  }
+  .btn-card.dragging {
+    opacity: 0.3;
+    transform: scale(0.92) !important;
+    animation: none !important;
+  }
+  .btn-card.drag-over {
+    border-color: #6cf !important;
+    box-shadow: 0 0 24px rgba(100,200,255,0.5) !important;
+    transform: scale(1.06) !important;
+    animation: none !important;
+  }
+  .drag-clone {
+    position: fixed;
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.92;
+    transform: rotate(2deg) scale(1.06);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+    border-radius: 20px;
+    transition: none;
+  }
 
   .btn-emoji {
     font-size: 40px;
@@ -350,6 +418,9 @@
   <span class="toggle-label">⚡ 疯狂星期四模式 <small>— 每点必响，火力全开！</small></span>
 </label>
 
+<!-- 拖拽排序按钮 -->
+<button class="drag-toggle-btn" id="dragToggle" title="开启后可拖动按钮自定义排序">🔧 拖动排序</button>
+
 <!-- 按钮网格 -->
 <div class="grid" id="btnGrid"></div>
 
@@ -369,24 +440,44 @@
 <script>
 (function() {
   // ============ 音效列表 ============
-  const sounds = [
+  const soundsOrigin = [
     { file: "OMG吓死我啦.mp3",  emoji: "😱", label: "OMG吓死我啦" },
     { file: "奶龙笑.mp3",        emoji: "🐉", label: "奶龙笑" },
-    { file: "小丑音效.mp3",      emoji: "🤡", label: "小丑音效" },
+    { file: "小丑音效2.mp3",     emoji: "🤡", label: "小丑音效" },
     { file: "我要演牌.mp3",      emoji: "🃏", label: "我要演牌" },
     { file: "枪毙.mp3",          emoji: "🔫", label: "枪毙" },
     { file: "牌没有问题.mp3",    emoji: "✅", label: "牌没有问题" },
     { file: "给我擦皮鞋.mp3",    emoji: "👞", label: "给我擦皮鞋" },
     { file: "重机枪.mp3",        emoji: "💥", label: "重机枪" },
+    { file: "OMG男生part.mp3",   emoji: "🎤", label: "OMG男生part" },
   ];
+
+  // 从 localStorage 恢复排序
+  const STORAGE_KEY = "omg-sound-order";
+  let savedOrder = null;
+  try { savedOrder = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e) {}
+  const sounds = [];
+  if (savedOrder && Array.isArray(savedOrder)) {
+    const map = new Map(soundsOrigin.map(s => [s.file, s]));
+    savedOrder.forEach(f => { if (map.has(f)) sounds.push(map.get(f)); });
+    soundsOrigin.forEach(s => { if (!savedOrder.includes(s.file)) sounds.push(s); });
+  } else {
+    sounds.push(...soundsOrigin);
+  }
 
   // ============ 状态 ============
   let currentAudio = null;
   let currentIndex = -1;
+  let dragMode = false;
+  let dragCard = null;
+  let dragClone = null;
+  let dragStartX = 0, dragStartY = 0;
+  let dragOffX = 0, dragOffY = 0;
   const crazyCheckbox = document.getElementById("crazyMode");
   const nowPlayingEl = document.getElementById("nowPlaying");
   const nowPlayingText = document.getElementById("nowPlayingText");
   const btnGrid = document.getElementById("btnGrid");
+  const dragToggle = document.getElementById("dragToggle");
 
   // ============ 停止当前音效 ============
   function stopCurrent() {
@@ -448,6 +539,7 @@
 
   // ============ 处理按钮点击 ============
   function handleClick(index) {
+    if (dragMode) return; // 拖拽模式下不触发音效
     const isCrazy = crazyCheckbox.checked;
 
     if (currentIndex === index && currentAudio) {
@@ -470,14 +562,130 @@
   }
 
   // ============ 渲染按钮 ============
-  sounds.forEach((s, i) => {
-    const card = document.createElement("div");
-    card.className = "btn-card";
-    card.setAttribute("data-index", i);
-    card.innerHTML = `<span class="btn-emoji">${s.emoji}</span><span class="btn-name">${s.label}</span>`;
-    card.addEventListener("click", () => handleClick(i));
-    btnGrid.appendChild(card);
+  function renderButtons() {
+    btnGrid.innerHTML = "";
+    sounds.forEach((s, i) => {
+      const card = document.createElement("div");
+      card.className = "btn-card";
+      card.setAttribute("data-index", i);
+      card.setAttribute("data-file", s.file);
+      card.innerHTML = `<span class="btn-emoji">${s.emoji}</span><span class="btn-name">${s.label}</span>`;
+      card.addEventListener("click", function() { handleClick(parseInt(this.dataset.index)); });
+      card.addEventListener("pointerdown", e => onDragStart(e, card));
+      btnGrid.appendChild(card);
+    });
+  }
+  renderButtons();
+
+  // ============ 保存排序 ============
+  function saveOrder() {
+    const order = [];
+    document.querySelectorAll(".btn-card").forEach(c => order.push(c.dataset.file));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
+    // 同步 sounds 数组
+    const map = new Map(soundsOrigin.map(s => [s.file, s]));
+    sounds.length = 0;
+    order.forEach(f => { if (map.has(f)) sounds.push(map.get(f)); });
+    // 更新 data-index
+    document.querySelectorAll(".btn-card").forEach((c, i) => { c.dataset.index = i; });
+  }
+
+  // ============ 拖拽排序逻辑 ============
+  dragToggle.addEventListener("click", () => {
+    dragMode = !dragMode;
+    if (dragMode) {
+      btnGrid.classList.add("drag-mode");
+      dragToggle.classList.add("active");
+      dragToggle.textContent = "✅ 完成排序";
+      stopCurrent();
+    } else {
+      btnGrid.classList.remove("drag-mode");
+      dragToggle.classList.remove("active");
+      dragToggle.textContent = "🔧 拖动排序";
+    }
   });
+
+  function cleanupDrag() {
+    if (dragClone) { dragClone.remove(); dragClone = null; }
+    if (dragCard)  { dragCard.classList.remove("dragging"); dragCard = null; }
+    document.querySelectorAll(".btn-card.drag-over").forEach(c => c.classList.remove("drag-over"));
+  }
+
+  function onDragStart(e, card) {
+    if (!dragMode) return;
+    e.preventDefault();
+
+    // 清理可能残留的旧拖拽状态
+    cleanupDrag();
+
+    dragCard = card;
+    const rect = card.getBoundingClientRect();
+    dragOffX = e.clientX - rect.left;
+    dragOffY = e.clientY - rect.top;
+
+    // 创建拖拽幽灵
+    dragClone = card.cloneNode(true);
+    dragClone.classList.add("drag-clone");
+    dragClone.style.width = rect.width + "px";
+    dragClone.style.height = rect.height + "px";
+    dragClone.style.left = (e.clientX - dragOffX) + "px";
+    dragClone.style.top = (e.clientY - dragOffY) + "px";
+    document.body.appendChild(dragClone);
+
+    card.classList.add("dragging");
+
+    // 用 document 级监听，避免 pointerup 丢失
+    document.addEventListener("pointermove", onDragMove);
+    document.addEventListener("pointerup", onDragEnd);
+    document.addEventListener("pointercancel", onDragEnd);
+  }
+
+  function getDropTarget(x, y) {
+    const cards = [...btnGrid.querySelectorAll(".btn-card:not(.dragging)")];
+    let target = null;
+    let minDist = Infinity;
+    cards.forEach(c => {
+      const r = c.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const d = Math.hypot(x - cx, y - cy);
+      if (d < minDist) { minDist = d; target = c; }
+    });
+    return target;
+  }
+
+  function onDragMove(e) {
+    if (!dragClone) return;
+    dragClone.style.left = (e.clientX - dragOffX) + "px";
+    dragClone.style.top = (e.clientY - dragOffY) + "px";
+
+    document.querySelectorAll(".btn-card.drag-over").forEach(c => c.classList.remove("drag-over"));
+    const target = getDropTarget(e.clientX, e.clientY);
+    if (target && target !== dragCard) target.classList.add("drag-over");
+  }
+
+  function onDragEnd(e) {
+    // 先解绑，防止重复调用
+    document.removeEventListener("pointermove", onDragMove);
+    document.removeEventListener("pointerup", onDragEnd);
+    document.removeEventListener("pointercancel", onDragEnd);
+
+    try {
+      if (!dragCard) return;
+
+      document.querySelectorAll(".btn-card.drag-over").forEach(c => c.classList.remove("drag-over"));
+
+      const target = getDropTarget(e.clientX, e.clientY);
+      if (target && target !== dragCard) {
+        btnGrid.insertBefore(dragCard, target);
+      }
+
+      saveOrder();
+    } finally {
+      // 无论发生什么，一定清理干净
+      cleanupDrag();
+    }
+  }
 
   // ============ 漂浮 emoji 背景 ============
   const floatContainer = document.getElementById("floatingEmojis");
