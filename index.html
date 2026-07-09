@@ -473,8 +473,10 @@
   let dragCard = null;
   let dragClone = null;
   let dragPending = false;
+  let dragTimer = null;
   let dragOffX = 0, dragOffY = 0;
-  const DRAG_THRESHOLD = 8; // 移动超过 8px 才算拖拽
+  const DRAG_THRESHOLD = 15;
+  const DRAG_HOLD_MS = 200; // 按住 200ms 后拖拽才生效
   const crazyCheckbox = document.getElementById("crazyMode");
   const nowPlayingEl = document.getElementById("nowPlaying");
   const nowPlayingText = document.getElementById("nowPlayingText");
@@ -615,6 +617,7 @@
   });
 
   function cleanupDrag() {
+    if (dragTimer) { clearTimeout(dragTimer); dragTimer = null; }
     if (dragClone) { dragClone.remove(); dragClone = null; }
     if (dragCard)  { dragCard.classList.remove("dragging"); dragCard = null; }
     dragPending = false;
@@ -626,11 +629,14 @@
     e.preventDefault();
 
     cleanupDrag();
-    dragPending = true;
     dragCard = card;
+    dragPending = true;
     const rect = card.getBoundingClientRect();
     dragOffX = e.clientX - rect.left;
     dragOffY = e.clientY - rect.top;
+
+    // 按住 200ms 后才解除锁定，滑动页面不会误触
+    dragTimer = setTimeout(() => { dragPending = false; }, DRAG_HOLD_MS);
 
     document.addEventListener("pointermove", onDragMove);
     document.addEventListener("pointerup", onDragEnd);
@@ -652,14 +658,15 @@
   }
 
   function onDragMove(e) {
-    // 等待模式：移动超过阈值才正式进入拖拽
-    if (dragPending && dragCard) {
+    // 按住计时中：忽略所有移动，防止滑动页面误触
+    if (dragPending) return;
+
+    // 首次触发拖拽：移动需超过阈值
+    if (!dragClone && dragCard) {
       const dx = e.clientX - (dragCard.getBoundingClientRect().left + dragOffX);
       const dy = e.clientY - (dragCard.getBoundingClientRect().top + dragOffY);
       if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
 
-      // 达到阈值，正式开始拖拽
-      dragPending = false;
       const rect = dragCard.getBoundingClientRect();
       dragClone = dragCard.cloneNode(true);
       dragClone.classList.add("drag-clone");
@@ -669,6 +676,7 @@
       dragClone.style.top = (e.clientY - dragOffY) + "px";
       document.body.appendChild(dragClone);
       dragCard.classList.add("dragging");
+      return;
     }
 
     if (!dragClone) return;
@@ -687,15 +695,19 @@
 
     try {
       if (!dragCard) return;
-
-      // 等待模式下松手（没达到拖拽阈值），直接清理
-      if (dragPending) return;
+      if (dragPending) return;  // 按住计时中松手 → 不拖拽
+      if (!dragClone) return;   // 计时结束但没移动过 → 不拖拽
 
       document.querySelectorAll(".btn-card.drag-over").forEach(c => c.classList.remove("drag-over"));
 
       const target = getDropTarget(e.clientX, e.clientY);
       if (target && target !== dragCard) {
-        btnGrid.insertBefore(dragCard, target);
+        // 真正交换两个元素的位置
+        const place = document.createElement("div");
+        btnGrid.insertBefore(place, target);
+        btnGrid.insertBefore(target, dragCard);
+        btnGrid.insertBefore(dragCard, place);
+        place.remove();
       }
 
       saveOrder();
