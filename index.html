@@ -420,6 +420,7 @@
 
 <!-- 拖拽排序按钮 -->
 <button class="drag-toggle-btn" id="dragToggle" title="开启后可拖动按钮自定义排序">🔧 拖动排序</button>
+<button class="drag-toggle-btn" id="clearCache" title="清除排序缓存并刷新">🗑️ 清除缓存</button>
 
 <!-- 按钮网格 -->
 <div class="grid" id="btnGrid"></div>
@@ -478,6 +479,13 @@
   const nowPlayingText = document.getElementById("nowPlayingText");
   const btnGrid = document.getElementById("btnGrid");
   const dragToggle = document.getElementById("dragToggle");
+  const clearCacheBtn = document.getElementById("clearCache");
+
+  // 清除缓存
+  clearCacheBtn.addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  });
 
   // ============ 停止当前音效 ============
   function stopCurrent() {
